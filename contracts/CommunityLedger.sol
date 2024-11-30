@@ -49,4 +49,38 @@ contract CommunityLedger {
     function isResidence(uint16 residence) public view returns (bool) {
         return residences[residence];
     }
+
+    function addResident(
+        address resident,
+        uint16 residence
+    ) external onlyCouncil {
+        require(isResidence(residence), "Residence does not exist");
+        residents[resident] = residence;
+    }
+
+    function removeResident(address resident) external onlyManager {
+        require(!isCounselor(resident), "Resident is a counselor");
+        delete residents[resident];
+
+        if (counselors[resident]) {
+            delete counselors[resident];
+        }
+    }
+
+    function setCounselor(
+        address resident,
+        bool isEntering
+    ) external onlyManager {
+        if (isEntering) {
+            require(isResident(resident), "The counselor must be a resident");
+            counselors[resident] = true;
+        } else {
+            delete counselors[resident];
+        }
+    }
+
+    function setManager(address newManager) external onlyManager {
+        require(newManager != address(0), "Manager cannot be the zero address");
+        manager = newManager;
+    }
 }
