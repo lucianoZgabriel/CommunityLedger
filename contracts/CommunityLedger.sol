@@ -7,6 +7,24 @@ contract CommunityLedger {
     mapping(address => uint16) public residents;
     mapping(address => bool) public counselors;
 
+    enum VoteStatus {
+        PENDING,
+        VOTING,
+        APPROVED,
+        REJECTED
+    }
+
+    struct Proposal {
+        string title;
+        string description;
+        uint256 createdAt;
+        uint256 updatedAt;
+        uint256 endDate;
+        VoteStatus status;
+    }
+
+    mapping(bytes32 => Proposal) public proposals;
+
     constructor() {
         manager = msg.sender;
 
@@ -30,7 +48,7 @@ contract CommunityLedger {
         _;
     }
 
-    modifier onlyResident(uint16 residence) {
+    modifier onlyResident() {
         require(
             msg.sender == manager || isResident(msg.sender),
             "Only manager or resident can call this function"
@@ -82,5 +100,46 @@ contract CommunityLedger {
     function setManager(address newManager) external onlyManager {
         require(newManager != address(0), "Manager cannot be the zero address");
         manager = newManager;
+    }
+
+    function getProposal(
+        string memory title
+    ) public view returns (Proposal memory) {
+        bytes32 proposalId = keccak256(bytes(title));
+        return proposals[proposalId];
+    }
+
+    function isProposal(string memory title) public view returns (bool) {
+        return getProposal(title).createdAt > 0;
+    }
+
+    function createProposal(
+        string memory title,
+        string memory description
+    ) external onlyResident {
+        require(!isProposal(title), "Proposal already exists");
+
+        Proposal memory newProposal = Proposal({
+            title: title,
+            description: description,
+            createdAt: block.timestamp,
+            updatedAt: 0,
+            endDate: 0,
+            status: VoteStatus.PENDING
+        });
+
+        bytes32 proposalId = keccak256(bytes(title));
+        proposals[proposalId] = newProposal;
+    }
+
+    function removeProposal(string memory title) external onlyManager {
+        Proposal memory proposal = getProposal(title);
+        require(proposal.createdAt > 0, "Proposal does not exist");
+        require(
+            proposal.status == VoteStatus.PENDING,
+            "Only pending proposals can be removed"
+        );
+
+        delete proposals[keccak256(bytes(title))];
     }
 }
