@@ -14,6 +14,13 @@ contract CommunityLedger {
         REJECTED
     }
 
+    enum Options {
+        EMPTY,
+        YES,
+        NO,
+        ABSTAIN
+    }
+
     struct Proposal {
         string title;
         string description;
@@ -23,7 +30,15 @@ contract CommunityLedger {
         VoteStatus status;
     }
 
+    struct Vote {
+        address voter;
+        uint16 residence;
+        Options option;
+        uint256 createdAt;
+    }
+
     mapping(bytes32 => Proposal) public proposals;
+    mapping(bytes32 => Vote[]) public votes;
 
     constructor() {
         manager = msg.sender;
@@ -141,5 +156,74 @@ contract CommunityLedger {
         );
 
         delete proposals[keccak256(bytes(title))];
+    }
+
+    function openVote(string memory title) external onlyManager {
+        Proposal memory proposal = getProposal(title);
+        require(proposal.createdAt > 0, "Proposal does not exist");
+        require(
+            proposal.status == VoteStatus.PENDING,
+            "Proposal is not pending"
+        );
+
+        bytes32 proposalId = keccak256(bytes(title));
+        proposals[proposalId].status = VoteStatus.VOTING;
+        proposals[proposalId].updatedAt = block.timestamp;
+    }
+
+    function vote(string memory title, Options option) external onlyResident {
+        require(option != Options.EMPTY, "Option cannot be empty");
+
+        Proposal memory proposal = getProposal(title);
+        require(proposal.createdAt > 0, "Proposal does not exist");
+        require(proposal.status == VoteStatus.VOTING, "Vote is not open");
+
+        uint16 residence = residents[msg.sender];
+        bytes32 proposalId = keccak256(bytes(title));
+
+        Vote[] memory proposalVotes = votes[proposalId];
+        for (uint8 i = 0; i < proposalVotes.length; i++) {
+            require(proposalVotes[i].residence != residence, "Already voted");
+        }
+
+        Vote memory newVote = Vote({
+            voter: msg.sender,
+            residence: residence,
+            option: option,
+            createdAt: block.timestamp
+        });
+
+        votes[proposalId].push(newVote);
+    }
+
+    function closeVote(string memory title) external onlyManager {
+        Proposal memory proposal = getProposal(title);
+        require(proposal.createdAt > 0, "Proposal does not exist");
+        require(proposal.status == VoteStatus.VOTING, "Vote is not open");
+
+        uint8 yesVotes = 0;
+        uint8 noVotes = 0;
+        uint8 abstainVotes = 0;
+
+        bytes32 proposalId = keccak256(bytes(title));
+        Vote[] memory proposalVotes = votes[proposalId];
+
+        for (uint8 i = 0; i < proposalVotes.length; i++) {
+            if (proposalVotes[i].option == Options.YES) {
+                yesVotes++;
+            } else if (proposalVotes[i].option == Options.NO) {
+                noVotes++;
+            } else if (proposalVotes[i].option == Options.ABSTAIN) {
+                abstainVotes++;
+            }
+        }
+
+        if (yesVotes > noVotes) {
+            proposals[proposalId].status = VoteStatus.APPROVED;
+        } else {
+            proposals[proposalId].status = VoteStatus.REJECTED;
+        }
+
+        proposals[proposalId].endDate = block.timestamp;
     }
 }

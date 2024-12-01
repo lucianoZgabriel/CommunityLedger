@@ -93,9 +93,9 @@ describe("CommunityLedger", function () {
   it("should NOT change the manager correctly if not manager", async function () {
     const { communityLedger, resident } = await loadFixture(deployContract);
     const instance = communityLedger.connect(resident);
-    await expect(
-      instance.setManager(resident.address)
-    ).to.be.revertedWith("Only manager can call this function");
+    await expect(instance.setManager(resident.address)).to.be.revertedWith(
+      "Only manager can call this function"
+    );
   });
 
   it("should NOT change the manager to the zero address", async function () {
@@ -103,5 +103,70 @@ describe("CommunityLedger", function () {
     await expect(
       communityLedger.setManager(ethers.ZeroAddress)
     ).to.be.revertedWith("Manager cannot be the zero address");
+  });
+
+  it("should create a proposal correctly if manager", async function () {
+    const { communityLedger, resident } = await loadFixture(deployContract);
+    await communityLedger.createProposal(
+      "Test Proposal",
+      "This is a test proposal"
+    );
+    expect(await communityLedger.isProposal("Test Proposal")).to.equal(true);
+  });
+
+  it("should create a proposal correctly if resident", async function () {
+    const { communityLedger, resident } = await loadFixture(deployContract);
+    await communityLedger.addResident(resident.address, 1201);
+    const instance = communityLedger.connect(resident);
+    await instance.createProposal("Test Proposal", "This is a test proposal");
+    expect(await communityLedger.isProposal("Test Proposal")).to.equal(true);
+  });
+
+  it("should NOT create a proposal if not resident", async function () {
+    const { communityLedger, resident } = await loadFixture(deployContract);
+    const instance = communityLedger.connect(resident);
+    await expect(
+      instance.createProposal("Test Proposal", "This is a test proposal")
+    ).to.be.revertedWith("Only manager or resident can call this function");
+  });
+
+  it("should NOT create a proposal if already exists", async function () {
+    const { communityLedger, resident } = await loadFixture(deployContract);
+    await communityLedger.createProposal(
+      "Test Proposal",
+      "This is a test proposal"
+    );
+    await expect(
+      communityLedger.createProposal("Test Proposal", "This is a test proposal")
+    ).to.be.revertedWith("Proposal already exists");
+  });
+
+  it("should remove a proposal correctly", async function () {
+    const { communityLedger, resident } = await loadFixture(deployContract);
+    await communityLedger.createProposal(
+      "Test Proposal",
+      "This is a test proposal"
+    );
+    await communityLedger.removeProposal("Test Proposal");
+    expect(await communityLedger.isProposal("Test Proposal")).to.equal(false);
+  });
+
+  it("should NOT remove a proposal if not manager", async function () {
+    const { communityLedger, resident } = await loadFixture(deployContract);
+    await communityLedger.createProposal(
+      "Test Proposal",
+      "This is a test proposal"
+    );
+    const instance = communityLedger.connect(resident);
+    await expect(instance.removeProposal("Test Proposal")).to.be.revertedWith(
+      "Only manager can call this function"
+    );
+  });
+
+  it("should NOT remove a proposal if not exists", async function () {
+    const { communityLedger, resident } = await loadFixture(deployContract);
+    await expect(
+      communityLedger.removeProposal("Test Proposal")
+    ).to.be.revertedWith("Proposal does not exist");
   });
 });
