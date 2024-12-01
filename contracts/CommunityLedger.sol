@@ -226,4 +226,9 @@ contract CommunityLedger {
 
         proposals[proposalId].endDate = block.timestamp;
     }
+
+    function getVotes(string memory title) external view returns (uint256) {
+        bytes32 proposalId = keccak256(bytes(title));
+        return votes[proposalId].length;
+    }
 }
